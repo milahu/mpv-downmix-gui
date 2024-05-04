@@ -89,6 +89,15 @@ input_channel_names_by_layout["3.0"] = (
     (None, None, None),
 )
 
+# 3.1 Surround Mapping: L C R LFE
+# left, center, right, LFE
+# 3.0 with LFE
+input_channel_names_by_layout["3.1"] = (
+    ("FL", "FC", "FR"),
+    (None, "LFE", None),
+    (None, None, None),
+)
+
 # Quadraphonic Channel Mapping: FL FR BL BR
 # front left, front right, back left, back right
 # TODO how does mpv call this?
