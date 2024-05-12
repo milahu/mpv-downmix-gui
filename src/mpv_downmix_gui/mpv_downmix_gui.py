@@ -315,8 +315,15 @@ def main():
 
     mpv_proc = subprocess.Popen(mpv_args)
 
-    time.sleep(2) # wait for mpv to create the socket
-    mpv_ipc_client = python_mpv_jsonipc.MPV(start_mpv=False, ipc_socket=mpv_ipc_socket_path)
+    # wait for mpv to create the ipc socket
+    time.sleep(1)
+    mpv_ipc_client = None
+    for _ in range(10):
+        try:
+            mpv_ipc_client = python_mpv_jsonipc.MPV(start_mpv=False, ipc_socket=mpv_ipc_socket_path)
+        except FileNotFoundError:
+            time.sleep(1)
+    assert mpv_ipc_client, f"failed to open mpv ipc socket {mpv_ipc_socket_path}"
 
     #print("media_title", mpv_ipc_client.media_title)
     #print("time_pos", mpv_ipc_client.time_pos)
