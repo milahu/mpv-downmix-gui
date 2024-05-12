@@ -125,7 +125,7 @@ def get_coefficients(
             FR = dict(FL=0, FC=center*n, FR=front*n, BL=side2*n, BR=side1*n),
         )
 
-    if input_channel_layout in ("5.1", "6ch"):
+    if input_channel_layout in ("5.1", "5.1(side)", "6ch"):
         # 5.1 Surround Mapping: FL FC FR RL RR LFE
         # front left, front center, front right, rear left, rear right, LFE
         front = 1 * scale_front
