@@ -25,8 +25,6 @@ in most movie releases, audio tracks are too quiet
 https://ffmpeg.org/ffmpeg-filters.html#loudnorm
 """
 
-# TODO fix terminal after exit, so i dont need "stty sane"
-
 import sys
 import os
 import subprocess
@@ -34,6 +32,7 @@ import socket
 import tempfile
 import time
 import logging
+import atexit
 
 import tkinter as tk
 from tkinter import ttk
@@ -583,5 +582,18 @@ def main():
     if os.path.exists(mpv_ipc_socket_path):
         os.unlink(mpv_ipc_socket_path)
 
+
+
+def exit_handler():
+    # fix terminal after running mpv
+    # no. "stty sane" fails to reset the terminal cursor
+    # stty is part of coreutils
+    #subprocess.call(["stty", "sane"])
+    # tput is part of ncurses
+    subprocess.call(["tput", "init"])
+
+
+
 if __name__ == "__main__":
+    atexit.register(exit_handler)
     main()
