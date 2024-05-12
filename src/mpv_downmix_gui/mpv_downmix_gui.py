@@ -332,58 +332,90 @@ def main():
     #for key in ["volume", "metadata", "audio_params"]:
     #    print(key, getattr(mpv_ipc_client, key))
 
+    # state
+    input_channel_layout = None
+    downmix_coefficients = None
+    input_channel_names = []
+    scale_dict = dict()
+    audio_filter = ""
+    root_window = None
+    show_root_window = True
+
+    def after_change(key=None, value=None):
+        nonlocal audio_filter
+        for channel in downmix_coefficients["FL"]:
+            volume = scale_dict[f"volume.{channel}"].get()
+            balance = scale_dict[f"balance.{channel}"].get()
+            c = downmix_coefficients
+            c["FL"][channel], c["FR"][channel] = \
+                get_left_right_coefficient(volume, balance)
+        # TODO allow top copy audio filter from gui > options
+        audio_filter = downmix_rfc7845.get_ffmpeg_audio_filter(downmix_coefficients)
+        assert audio_filter.startswith("pan=stereo|FL=")
+        # TODO also print gui settings: FL, FC, FR, LFE, ...
+        print("\n" + audio_filter + "\n")
+        # wrap the value in quotes
+        af = 'pan="' + audio_filter[4:] + '"'
+        mpv_ipc_client.af_cmd("set", af)
+
+    def reset_downmix_to_rfc7845():
+        nonlocal input_channel_layout, downmix_coefficients, scale_dict
+        downmix_coefficients = downmix_rfc7845.get_coefficients(input_channel_layout)
+        for channel in downmix_coefficients["FL"]:
+            volume = get_channel_volume(downmix_coefficients, channel)
+            balance = get_channel_balance(downmix_coefficients, channel)
+            scale_dict[f"volume.{channel}"].set(volume)
+            scale_dict[f"balance.{channel}"].set(balance)
+        after_change()
+
     def change_audio_track(name, track):
-        #print(name, track)
+        nonlocal input_channel_layout, downmix_coefficients, scale_dict, root_window, show_root_window
+        # TODO? input_channel_names
+        print("change_audio_track", name, track)
         if track == None:
             # no audio track
             print("audio track:", None)
             return
         id = track["id"]
         channel_layout = track.get("demux-channels") # "stereo", "5.1(side)", ...
+        print("change_audio_track channel_layout", channel_layout)
+        if channel_layout.startswith("unknown"):
+            print(f"error: unknown channel layout {channel_layout}. set the channel layout with --audio-channels=layout, for example --audio-channels=3.1")
+            num_channels = track.get("audio-channels")
+            # TODO suggest possible layouts based on number of channels
+            return
+
+            mpv_ipc_client.quit()
+            mpv_proc.kill()
+            if os.path.exists(mpv_ipc_socket_path):
+                os.unlink(mpv_ipc_socket_path)
+            show_root_window = False
+            if root_window:
+                root_window.close()
+            print(f"error: unknown channel layout {channel_layout}. set the channel layout with --audio-channels=layout, for example --audio-channels=3.1")
+            num_channels = track.get("audio-channels")
+            # TODO suggest possible layouts based on number of channels
+            sys.exit(1)
+        set_input_channel_layout(input_channel_layout)
         title = track.get("title")
         #num_channels = track["audio-channels"]
         bitrate = track.get("demux-bitrate", 0)
         codec = track.get("codec")
-        print("audio track:", id, channel_layout, codec, bitrate/1000, title)
+        print("audio track:", id, input_channel_layout, codec, bitrate/1000, title)
         # TODO update: input_channel_layout downmix_coefficients scale_dict
-
-    #observer_id =
-    mpv_ipc_client.bind_property_observer("current-tracks/audio", change_audio_track)
-
-    for track in mpv_ipc_client.track_list:
-        if track["type"] != "audio":
-            continue
-        if track["selected"] == False:
-            continue
-        #print("audio track:", track)
-        id = track["id"]
-        channel_layout = track.get("demux-channels") # "stereo", "5.1(side)", ...
-        codec = track.get("codec")
-        bitrate = track.get("demux-bitrate", 0)
-        title = track.get("title")
-        print("audio track:", id, channel_layout, codec, bitrate/1000, title)
-        #mpv_ipc_client.bind_property_observer(f"track-list/{id}/selected", select_audio_track)
-
-    input_channel_layout = mpv_ipc_client.audio_params["channels"]
-    if input_channel_layout == "5.1(side)": # TODO verify
-        input_channel_layout = "5.1"
-
-    print("input_channel_layout", repr(input_channel_layout))
-
-    downmix_coefficients = downmix_rfc7845.get_coefficients(input_channel_layout)
-    print("downmix_coefficients", repr(downmix_coefficients))
+        reset_downmix_to_rfc7845()
 
 
 
     # root window
-    root = tk.Tk()
-    #root.geometry('300x200')
-    #root.resizable(False, False)
-    root.resizable(True, True)
-    #root.title("downmix: " + mpv_ipc_client.media_title)
-    root.title("downmix")
+    root_window = tk.Tk()
+    #root_window.geometry('300x200')
+    #root_window.resizable(False, False)
+    root_window.resizable(True, True)
+    #root_window.title("downmix: " + mpv_ipc_client.media_title)
+    root_window.title("downmix")
 
-    notebook = ttk.Notebook(root)
+    notebook = ttk.Notebook(root_window)
     notebook.pack(pady=10, fill='both', expand=True)
 
     frame_dict = dict()
@@ -408,34 +440,11 @@ def main():
     option["checkbutton"] = tk.Checkbutton(frame, text=option_id, variable=option["value"])
     option["checkbutton"].pack()
 
-    def reset_downmix_to_rfc7845():
-        downmix_coefficients = downmix_rfc7845.get_coefficients(input_channel_layout)
-        for channel in downmix_coefficients["FL"]:
-            volume = get_channel_volume(downmix_coefficients, channel)
-            balance = get_channel_balance(downmix_coefficients, channel)
-            scale_dict[f"volume.{channel}"].set(volume)
-            scale_dict[f"balance.{channel}"].set(balance)
-        after_change()
-
     option_id = "reset to RFC 7845"
     option = dict()
     options_dict[option_id] = option
     option["button"] = tk.Button(frame, text=option_id, command=reset_downmix_to_rfc7845)
     option["button"].pack()
-
-    def after_change(key=None, value=None):
-        for channel in downmix_coefficients["FL"]:
-            volume = scale_dict[f"volume.{channel}"].get()
-            balance = scale_dict[f"balance.{channel}"].get()
-            c = downmix_coefficients
-            c["FL"][channel], c["FR"][channel] = \
-                get_left_right_coefficient(volume, balance)
-        af = downmix_rfc7845.get_ffmpeg_audio_filter(downmix_coefficients)
-        assert af.startswith("pan=stereo|FL=")
-        print(af)
-        # wrap the value in quotes
-        af = 'pan="' + af[4:] + '"'
-        mpv_ipc_client.af_cmd("set", af)
 
     def on_change(key, value):
         if options_dict["lock sides"]["value"].get() == 0:
@@ -453,9 +462,19 @@ def main():
         #print(key, value)
         pass
 
-    input_channel_names = input_channel_names_by_layout[input_channel_layout]
+    #def set_input_channel_names(input_channel_layout)
+    def set_input_channel_layout(channel_layout):
+        nonlocal input_channel_layout, input_channel_names, downmix_coefficients
+        if not channel_layout:
+            return
+        print("set_input_channel_layout", repr(channel_layout))
+        input_channel_layout = channel_layout
+        input_channel_names = input_channel_names_by_layout[input_channel_layout]
+        print("set_input_channel_layout input_channel_names", repr(input_channel_names))
+        downmix_coefficients = downmix_rfc7845.get_coefficients(input_channel_layout)
+        update_scale_dict()
 
-    scale_dict = dict()
+    set_input_channel_layout(input_channel_layout)
 
     def get_lin_value(value):
         return value/10
@@ -466,8 +485,12 @@ def main():
     def get_log_value(value):
         return 10**(value/10)
 
-    #print("init")
-    for frame_id in ["volume", "balance"]:
+    def update_scale_dict():
+        for frame_id in ["volume", "balance"]:
+            update_scale_dict_of_frame_id(frame_id)
+
+    def update_scale_dict_of_frame_id(frame_id):
+        nonlocal scale_dict, downmix_coefficients
         frame = frame_dict[frame_id]
         #get_value = get_log_value if frame_id == "volume" else get_lin_value
         get_value = get_lin_value
@@ -503,8 +526,55 @@ def main():
                 scale.grid(column=col_idx, row=row_idx, padx=5, pady=5)
                 scale_dict[key] = scale
 
-    root.mainloop()
+    update_scale_dict()
 
+
+
+    #observer_id =
+    mpv_ipc_client.bind_property_observer("current-tracks/audio", change_audio_track)
+
+    for track in mpv_ipc_client.track_list:
+        if track["type"] != "audio":
+            continue
+        if track["selected"] == False:
+            continue
+        #print("audio track:", track)
+        id = track["id"]
+        channel_layout = track.get("demux-channels") # "stereo", "5.1(side)", ...
+        codec = track.get("codec")
+        bitrate = track.get("demux-bitrate", 0)
+        title = track.get("title")
+        print("audio track:", id, channel_layout, codec, bitrate/1000, title)
+        #mpv_ipc_client.bind_property_observer(f"track-list/{id}/selected", select_audio_track)
+
+    """
+    input_channel_layout = mpv_ipc_client.audio_params["channels"]
+    print("input_channel_layout", repr(input_channel_layout))
+
+    downmix_coefficients = downmix_rfc7845.get_coefficients(input_channel_layout)
+    print("downmix_coefficients", repr(downmix_coefficients))
+    """
+
+    # FIXME
+    # change_audio_track channel_layout unknown4
+    # audio_params input_channel_layout '3.1'
+
+    audio_params = mpv_ipc_client.audio_params
+    if audio_params:
+        channel_layout = mpv_ipc_client.audio_params["channels"]
+        print("audio_params channel_layout", repr(channel_layout))
+        set_input_channel_layout(channel_layout)
+
+        reset_downmix_to_rfc7845()
+    else:
+        print("mpv_ipc_client.audio_params is empty. waiting for change_audio_track event")
+
+
+
+    if show_root_window:
+        root_window.mainloop()
+
+    mpv_ipc_client.quit()
     mpv_proc.kill()
 
     if os.path.exists(mpv_ipc_socket_path):
