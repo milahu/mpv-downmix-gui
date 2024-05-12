@@ -65,89 +65,226 @@ def get_left_right_coefficient(volume, balance):
 
 
 
+# see also
+# mpv --audio-channels=help | grep 5.1
 input_channel_names_by_layout = dict()
 
-# TODO how does mpv call this? mono?
-input_channel_names_by_layout["mono"] = (
+N = input_channel_names_by_layout
+
+# empty            ()
+N["empty"] = (
+    (None, None, None),
+    (None, None, None),
+    (None, None, None),
+)
+
+# mono             (fc)
+# 1.0              (fc)
+N["mono"] = N["1.0"] = (
     (None, "FC", None),
     (None, None, None),
     (None, None, None),
 )
 
-input_channel_names_by_layout["stereo"] = (
+# stereo           (fl-fr)
+# 2.0              (fl-fr)
+N["stereo"] = N["2.0"] = (
     ("FL", None, "FR"),
     (None, None, None),
     (None, None, None),
 )
 
-# Linear Surround Channel Mapping: L C R
-# left, center, right
-# TODO how does mpv call this?
-input_channel_names_by_layout["3.0"] = (
+# 2.1              (fl-fr-lfe)
+N["2.1"] = (
+    ("FL", None, "FR"),
+    (None, "LFE", None),
+    (None, None, None),
+)
+
+# 3.0              (fl-fr-fc)
+N["3.0"] = (
     ("FL", "FC", "FR"),
     (None, None, None),
     (None, None, None),
 )
 
-# 3.1 Surround Mapping: L C R LFE
+# 3.0(back)        (fl-fr-bc)
+N["3.0(back)"] = (
+    ("FL", None, "FR"),
+    (None, None, None),
+    (None, "BC", None),
+)
+
+# 3.1              (fl-fr-fc-lfe)
 # left, center, right, LFE
-# 3.0 with LFE
-input_channel_names_by_layout["3.1"] = (
+N["3.1"] = (
     ("FL", "FC", "FR"),
     (None, "LFE", None),
     (None, None, None),
 )
 
+# 3.1(back)        (fl-fr-lfe-bc)
+N["3.1(back)"] = (
+    ("FL", None, "FR"),
+    (None, "LFE", None),
+    (None, "BC", None),
+)
+
+# 4.0              (fl-fr-fc-bc)
+N["4.0"] = (
+    ("FL", "FC", "FR"),
+    (None, None, None),
+    (None, "BC", None),
+)
+
+# 4.1              (fl-fr-fc-lfe-bc)
+N["4.1"] = (
+    ("FL", "FC", "FR"),
+    (None, "LFE", None),
+    (None, "BC", None),
+)
+
+# quad             (fl-fr-bl-br)
 # Quadraphonic Channel Mapping: FL FR BL BR
 # front left, front right, back left, back right
-# TODO how does mpv call this?
-input_channel_names_by_layout["quadraphonic"] = (
+N["quad"] = (
     ("FL", None, "FR"),
     (None, None, None),
     ("BL", None, "BR"),
 )
 
+# 4.1(alsa)        (fl-fr-bl-br-lfe)
+# quad + LFE
+N["4.1(alsa)"] = (
+    ("FL", None, "FR"),
+    (None, "LFE", None),
+    ("BL", None, "BR"),
+)
+
+# quad(side)       (fl-fr-sl-sr)
+N["quad(side)"] = (
+    ("FL", None, "FR"),
+    ("SL", None, "SR"),
+    (None, None, None),
+)
+
+# 5.0              (fl-fr-fc-bl-br)
+# 5.0(alsa)        (fl-fr-bl-br-fc)
 # 5.0 Surround Mapping: FL FC FR RL RR
 # 5.1 without LFE
 # front left, front center, front right, back left, back right
-input_channel_names_by_layout["5.0"] = (
+N["5.0"] = N["5.0(alsa)"] = (
     ("FL", "FC", "FR"),
     (None, None, None),
     ("BL", None, "BR"),
 )
 
+# 5.0(side)        (fl-fr-fc-sl-sr)
+N["5.0(side)"] = (
+    ("FL", "FC", "FR"),
+    ("SL", None, "SR"),
+    (None, None, None),
+)
+
+# 5.1              (fl-fr-fc-lfe-bl-br)
+# 5.1(alsa)        (fl-fr-bl-br-fc-lfe)
 # 5.1 Surround Mapping: FL FC FR RL RR LFE
 # front left, front center, front right, back left, back right, LFE
 # note: ffmpeg says "back" instead of "rear" -> "BL" instead of "RL"
-# mpv calls this "5.1(side)" TODO verify
-input_channel_names_by_layout["5.1"] = (
+N["5.1"] = N["5.1(alsa)"] = (
     ("FL", "FC", "FR"),
     (None, "LFE", None),
     ("BL", None, "BR"),
 )
 
+# 5.1(side)        (fl-fr-fc-lfe-sl-sr)
+N["5.1(side)"] = (
+    ("FL", "FC", "FR"),
+    ("SL", "LFE", "SR"),
+    (None, None, None),
+)
+
+# 6.0              (fl-fr-fc-bc-sl-sr)
+N["6.0"] = (
+    ("FL", "FC", "FR"),
+    ("SL", None, "SR"),
+    (None, "BC", None),
+)
+
+# 6.0(front)       (fl-fr-flc-frc-sl-sr)
+# FIXME does not fit into 3x3 grid
+
+# hexagonal        (fl-fr-fc-bl-br-bc)
+N["hexagonal"] = (
+    ("FL", "FC", "FR"),
+    (None, None, None),
+    ("BL", "BC", "BR"),
+)
+
+# 6.1              (fl-fr-fc-lfe-bc-sl-sr)
 # 6.1 Surround Mapping: FL FC FR SL SR BC LFE
 # front left, front center, front right, side left, side right, back center, LFE
 # 5.1 + back center, "back" -> "side"
-input_channel_names_by_layout["6.1"] = (
+N["6.1"] = (
     ("FL", "FC", "FR"),
     ("SL", "LFE", "SR"),
     (None, "BC", None),
 )
 
+# 6.1(back)        (fl-fr-fc-lfe-bl-br-bc)
+# hexagonal + LFE
+N["6.1(back)"] = (
+    ("FL", "FC", "FR"),
+    (None, "LFE", None),
+    ("BL", "BC", "BR"),
+)
+
+# 6.1(top)         (fl-fr-fc-lfe-bl-br-tc)
+# FIXME does not fit into 3x3 grid
+
+# 6.1(front)       (fl-fr-lfe-flc-frc-sl-sr)
+# FIXME does not fit into 3x3 grid
+
+# 7.0              (fl-fr-fc-bl-br-sl-sr)
+N["7.0"] = (
+    ("FL", "FC", "FR"),
+    ("SL", None, "SR"),
+    ("BL", None, "BR"),
+)
+
+# 7.0(front)       (fl-fr-fc-flc-frc-sl-sr)
+# FIXME does not fit into 3x3 grid
+
+# 7.0(rear)        (fl-fr-fc-bl-br-sdl-sdr)
+# FIXME does not fit into 3x3 grid
+
+# 7.1              (fl-fr-fc-lfe-bl-br-sl-sr)
+# 7.1(alsa)        (fl-fr-bl-br-fc-lfe-sl-sr)
 # 7.1 Surround Mapping: FL FC FR SL SR BL BR LFE
 # front left, front center, front right, side left, side right, back left, back right, LFE
 # 6.1 + BC -> BL BR
-input_channel_names_by_layout["7.1"] = (
+N["7.1"] = N["7.1(alsa)"] = (
     ("FL", "FC", "FR"),
     ("SL", "LFE", "SR"),
     ("BL", None, "BR"),
 )
 
+# 7.1(wide)        (fl-fr-fc-lfe-bl-br-flc-frc)
+# FIXME does not fit into 3x3 grid
+
+# 7.1(wide-side)   (fl-fr-fc-lfe-flc-frc-sl-sr)
+# FIXME does not fit into 3x3 grid
+
+# 7.1(top)         (fl-fr-fc-lfe-bl-br-tfl-tfr)
+# FIXME does not fit into 3x3 grid
+
+# 7.1(rear)        (fl-fr-fc-lfe-bl-br-sdl-sdr)
+# FIXME does not fit into 3x3 grid
+
 # 8.1 Surround Mapping: FL FC FR SL SR BL BC BR LFE
 # front left, front center, front right, side left, side right, back left, back right, LFE
 # 7.1 + BC
-input_channel_names_by_layout["8.1"] = (
+N["8.1"] = (
     ("FL", "FC", "FR"),
     ("SL", "LFE", "SR"),
     ("BL", "BC", "BR"),
