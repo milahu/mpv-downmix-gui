@@ -296,7 +296,10 @@ N["8.1"] = (
 
 def main():
 
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(
+        # DEBUG:mpv-jsonipc:command list: ...
+        #level=logging.DEBUG,
+    )
 
     if len(sys.argv) < 2:
         print("error: no arguments")
