@@ -5,7 +5,7 @@ from setuptools import setup
 
 setup(
   name='mpv-downmix-gui',
-  version='0.0.2',
+  version='0.0.3',
   #install_requires=install_requires,
   install_requires=[
     'tkinter',
