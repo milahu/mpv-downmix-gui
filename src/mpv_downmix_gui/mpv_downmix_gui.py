@@ -499,7 +499,7 @@ def main():
         set_value = set_lin_value
         if frame_id == "volume":
             from_ = 0
-            to = 1
+            to = 4
             get_init_value = get_channel_volume
         elif frame_id == "balance":
             from_ = -1
