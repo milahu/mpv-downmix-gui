@@ -57,6 +57,22 @@ def get_channel_balance(coefficients, channel):
     L, R = coefficients["FL"][channel], coefficients["FR"][channel]
     return (R - L) / (R + L)
 
+def get_config_value(downmix_config, frame_id, channel_name):
+    #print("get_config_value downmix_config", downmix_config)
+    #print("get_config_value frame_id, channel_name", frame_id, channel_name)
+    if not type(downmix_config) == dict:
+        return
+    if not frame_id in downmix_config:
+        return
+    if not channel_name in downmix_config[frame_id]:
+        return
+    value = downmix_config[frame_id][channel_name]
+    # allow values like "2*0.7" -> 1.4
+    if type(value) == str:
+        value = eval(value)
+    #print("get_config_value value", frame_id, channel_name, value)
+    return value
+
 def get_left_right_coefficient(volume, balance):
     return (
         (((1 - balance) * volume) / 2),
@@ -307,6 +323,8 @@ def main():
         print(f"  {sys.argv[0]} mpv_arg...")
         print("example:")
         print(f"  {sys.argv[0]} movie.mp4 --audio-file=audio.m4a")
+        print("extra arguments:")
+        print(f"  {sys.argv[0]} movie.mp4 --downmix-config=downmix.json")
         sys.exit(1)
 
     mpv_ipc_socket_path = tempfile.mktemp(prefix='mpv_ipc_socket.')
@@ -314,7 +332,30 @@ def main():
     mpv_args = [
         "mpv",
         f"--input-ipc-server={mpv_ipc_socket_path}",
-    ] + sys.argv[1:]
+    ]
+
+    downmix_config = None
+
+    for arg in sys.argv[1:]:
+        if arg.startswith("--downmix-config="):
+            path = arg[17:]
+            print("reading downmix config: {path!r}")
+            try:
+                with open(path, "r") as f:
+                    downmix_config = json.load(f)
+            except Exception as exc:
+                print(f"error: failed to read downmix config: {exc}")
+        else:
+            mpv_args.append(arg)
+
+    if type(downmix_config) == dict:
+        if not "volume" in downmix_config:
+            print("error: invalid downmix config: no volume")
+            downmix_config = None
+        elif not "balance" in downmix_config:
+            print("error: invalid downmix config: no balance")
+            downmix_config = None
+        # ...
 
     mpv_proc = subprocess.Popen(mpv_args)
 
@@ -498,7 +539,7 @@ def main():
             update_scale_dict_of_frame_id(frame_id)
 
     def update_scale_dict_of_frame_id(frame_id):
-        nonlocal scale_dict, downmix_coefficients
+        nonlocal scale_dict, downmix_coefficients, downmix_config
         frame = frame_dict[frame_id]
         #get_value = get_log_value if frame_id == "volume" else get_lin_value
         get_value = get_lin_value
@@ -516,7 +557,9 @@ def main():
                 if channel_name == None:
                     continue
                 key = f"{frame_id}.{channel_name}"
-                init_value = get_init_value(downmix_coefficients, channel_name)
+                init_value = get_config_value(downmix_config, frame_id, channel_name)
+                if init_value is None:
+                    init_value = get_init_value(downmix_coefficients, channel_name)
                 #print(f"  {key} = {init_value}")
                 scale = tk_scale_debounced(
                     frame,
@@ -574,7 +617,11 @@ def main():
         print("audio_params channel_layout", repr(channel_layout))
         set_input_channel_layout(channel_layout)
 
-        reset_downmix_to_rfc7845()
+        if not downmix_config:
+            reset_downmix_to_rfc7845()
+        else:
+            after_change()
+
     else:
         print("mpv_ipc_client.audio_params is empty. waiting for change_audio_track event")
 
