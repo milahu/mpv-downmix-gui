@@ -33,6 +33,7 @@ import tempfile
 import time
 import logging
 import atexit
+import json
 
 import tkinter as tk
 from tkinter import ttk
@@ -345,17 +346,20 @@ def main():
 
     def after_change(key=None, value=None):
         nonlocal audio_filter
+        gui_config = dict(volume={}, balance={})
         for channel in downmix_coefficients["FL"]:
             volume = scale_dict[f"volume.{channel}"].get()
             balance = scale_dict[f"balance.{channel}"].get()
+            gui_config["volume"][channel] = volume
+            gui_config["balance"][channel] = balance
             c = downmix_coefficients
             c["FL"][channel], c["FR"][channel] = \
                 get_left_right_coefficient(volume, balance)
         # TODO allow top copy audio filter from gui > options
         audio_filter = downmix_rfc7845.get_ffmpeg_audio_filter(downmix_coefficients)
         assert audio_filter.startswith("pan=stereo|FL=")
-        # TODO also print gui settings: FL, FC, FR, LFE, ...
-        print("\n" + audio_filter + "\n")
+        gui_config_str = json.dumps(gui_config, separators=(',', ':'))
+        print("\n" + gui_config_str + "\n" + audio_filter + "\n")
         # wrap the value in quotes
         af = 'pan="' + audio_filter[4:] + '"'
         mpv_ipc_client.af_cmd("set", af)
