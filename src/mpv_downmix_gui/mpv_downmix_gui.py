@@ -524,6 +524,7 @@ def main():
                     init_value=init_value,
                     from_=from_,
                     to=to,
+                    length=200,
                 )
                 scale.grid(column=col_idx, row=row_idx, padx=5, pady=5)
                 scale_dict[key] = scale
