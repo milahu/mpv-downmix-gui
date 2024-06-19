@@ -478,14 +478,16 @@ def main():
 
     set_input_channel_layout(input_channel_layout)
 
+    precision = 20 # 1 step = 0.05
+
     def get_lin_value(value):
-        return value/10
+        return value/precision
 
     def set_lin_value(value):
-        return value*10
+        return value*precision
 
     def get_log_value(value):
-        return 10**(value/10)
+        return 10**(value/precision)
 
     def update_scale_dict():
         for frame_id in ["volume", "balance"]:
